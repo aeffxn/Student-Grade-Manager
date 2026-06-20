@@ -1,171 +1,196 @@
-# Student Grade Manager - v1 (Command Line version)
-# Simple program to add students, add marks, and calculate averages.
+# Student Grade Manager - v2
+# Refactored v1 to use a class instead of dictionaries.
 
 import json
 import os
 
 FILENAME = "students.txt"
 
-students = []
+
+class Student:
+    def __init__(self, name, marks=None):
+        self.name = name
+        self.marks = marks if marks else []
+
+    def add_mark(self, mark):
+        self.marks.append(mark)
+
+    def average(self):
+        if len(self.marks) == 0:
+            return 0
+        return sum(self.marks) / len(self.marks)
+
+    def highest(self):
+        if len(self.marks) == 0:
+            return 0
+        return max(self.marks)
+
+    def lowest(self):
+        if len(self.marks) == 0:
+            return 0
+        return min(self.marks)
+
+    def to_dict(self):
+        return {"name": self.name, "marks": self.marks}
 
 
-def load_data():
-    if os.path.exists(FILENAME):
-        with open(FILENAME, "r") as f:
-            data = f.read()
-            if data:
-                return json.loads(data)
-    return []
+class GradeManager:
+    def __init__(self):
+        self.students = []
+        self.load()
 
+    def load(self):
+        if os.path.exists(FILENAME):
+            with open(FILENAME, "r") as f:
+                content = f.read()
+                if content:
+                    data = json.loads(content)
+                    for entry in data:
+                        self.students.append(Student(entry["name"], entry["marks"]))
 
-def save_data():
-    with open(FILENAME, "w") as f:
-        json.dump(students, f)
+    def save(self):
+        data = [s.to_dict() for s in self.students]
+        with open(FILENAME, "w") as f:
+            json.dump(data, f)
 
+    def add_student(self, name):
+        # check for duplicate names so we don't end up with two "Ali"s
+        for s in self.students:
+            if s.name.lower() == name.lower():
+                print(f"{name} is already in the list.")
+                return
+        self.students.append(Student(name))
+        print(f"{name} added.")
 
-def add_student():
-    name = input("Enter student name: ")
-    new_student = {"name": name, "marks": []}
-    students.append(new_student)
-    print(name + " has been added.")
+    def show_students(self):
+        if len(self.students) == 0:
+            print("No students yet.")
+            return
 
+        print("\n--- Students ---")
+        for i, s in enumerate(self.students):
+            print(f"{i + 1}. {s.name} - marks: {s.marks}")
+        print("----------------\n")
 
-def add_mark():
-    if len(students) == 0:
-        print("No students yet. Add a student first.")
-        return
+    def get_student_choice(self):
+        self.show_students()
+        if len(self.students) == 0:
+            return None
 
-    show_students()
-    choice = input("Enter the number of the student: ")
+        choice = input("Enter the number of the student: ")
+        try:
+            index = int(choice) - 1
+        except ValueError:
+            print("That's not a number.")
+            return None
 
-    try:
-        index = int(choice) - 1
-    except:
-        print("That's not a number.")
-        return
+        if index < 0 or index >= len(self.students):
+            print("Invalid choice.")
+            return None
 
-    if index < 0 or index >= len(students):
-        print("Invalid choice.")
-        return
+        return self.students[index]
 
-    mark = input("Enter the mark: ")
-    try:
-        mark = float(mark)
-    except:
-        print("That's not a valid mark.")
-        return
+    def add_mark_to_student(self):
+        student = self.get_student_choice()
+        if student is None:
+            return
 
-    students[index]["marks"].append(mark)
-    print("Mark added.")
+        mark_input = input("Enter the mark (0-100): ")
+        try:
+            mark = float(mark_input)
+        except ValueError:
+            print("That's not a valid mark.")
+            return
 
+        if mark < 0 or mark > 100:
+            print("Mark should be between 0 and 100.")
+            return
 
-def show_students():
-    if len(students) == 0:
-        print("No students added yet.")
-        return
+        student.add_mark(mark)
+        print("Mark added.")
 
-    print("\n--- Students ---")
-    for i in range(len(students)):
-        s = students[i]
-        print(str(i + 1) + ". " + s["name"] + " - marks: " + str(s["marks"]))
-    print("----------------\n")
+    def show_average(self):
+        student = self.get_student_choice()
+        if student is None:
+            return
 
+        if len(student.marks) == 0:
+            print(f"{student.name} has no marks yet.")
+            return
 
-def calculate_average():
-    if len(students) == 0:
-        print("No students yet.")
-        return
+        print(f"{student.name}'s average is {student.average():.2f}")
 
-    show_students()
-    choice = input("Enter the number of the student: ")
+    def show_highest_lowest(self):
+        students_with_marks = [s for s in self.students if len(s.marks) > 0]
 
-    try:
-        index = int(choice) - 1
-    except:
-        print("That's not a number.")
-        return
+        if len(students_with_marks) == 0:
+            print("Nobody has marks yet.")
+            return
 
-    if index < 0 or index >= len(students):
-        print("Invalid choice.")
-        return
+        top_student = students_with_marks[0]
+        bottom_student = students_with_marks[0]
 
-    marks = students[index]["marks"]
-    if len(marks) == 0:
-        print(students[index]["name"] + " has no marks yet.")
-        return
+        for s in students_with_marks:
+            if s.average() > top_student.average():
+                top_student = s
+            if s.average() < bottom_student.average():
+                bottom_student = s
 
-    total = 0
-    for m in marks:
-        total = total + m
-    avg = total / len(marks)
+        print(f"Highest scorer: {top_student.name} ({top_student.average():.2f})")
+        print(f"Lowest scorer: {bottom_student.name} ({bottom_student.average():.2f})")
 
-    print(students[index]["name"] + "'s average is: " + str(avg))
+    def delete_student(self):
+        student = self.get_student_choice()
+        if student is None:
+            return
 
-
-def find_highest_lowest():
-    if len(students) == 0:
-        print("No students yet.")
-        return
-
-    best_student = None
-    best_avg = -1
-    worst_student = None
-    worst_avg = 101
-
-    for s in students:
-        if len(s["marks"]) == 0:
-            continue
-        avg = sum(s["marks"]) / len(s["marks"])
-        if avg > best_avg:
-            best_avg = avg
-            best_student = s["name"]
-        if avg < worst_avg:
-            worst_avg = avg
-            worst_student = s["name"]
-
-    if best_student is None:
-        print("No marks recorded yet for anyone.")
-        return
-
-    print("Highest scorer: " + best_student + " (" + str(best_avg) + ")")
-    print("Lowest scorer: " + worst_student + " (" + str(worst_avg) + ")")
+        confirm = input(f"Are you sure you want to delete {student.name}? (y/n): ")
+        if confirm.lower() == "y":
+            self.students.remove(student)
+            print(f"{student.name} deleted.")
+        else:
+            print("Cancelled.")
 
 
 def print_menu():
-    print("\n===== Student Grade Manager =====")
+    print("\n===== Student Grade Manager (v2) =====")
     print("1. Add student")
     print("2. Add mark")
     print("3. Show all students")
     print("4. Calculate average for a student")
     print("5. Show highest/lowest scorer")
-    print("6. Save and exit")
-    print("==================================")
+    print("6. Delete a student")
+    print("7. Save and exit")
+    print("========================================")
 
 
 def main():
-    global students
-    students = load_data()
+    manager = GradeManager()
 
     while True:
         print_menu()
-        choice = input("Choose an option (1-6): ")
+        choice = input("Choose an option (1-7): ")
 
         if choice == "1":
-            add_student()
+            name = input("Enter student name: ")
+            manager.add_student(name)
         elif choice == "2":
-            add_mark()
+            manager.add_mark_to_student()
         elif choice == "3":
-            show_students()
+            manager.show_students()
         elif choice == "4":
-            calculate_average()
+            manager.show_average()
         elif choice == "5":
-            find_highest_lowest()
+            manager.show_highest_lowest()
         elif choice == "6":
-            save_data()
+            manager.delete_student()
+        elif choice == "7":
+            manager.save()
             print("Data saved. Goodbye!")
             break
         else:
             print("Invalid option, try again.")
 
 
-main()
+if __name__ == "__main__":
+    main()
